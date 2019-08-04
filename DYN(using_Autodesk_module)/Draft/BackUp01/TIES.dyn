@@ -1,0 +1,257 @@
+{
+  "Uuid": "68657227-557d-4edf-8ce0-65e01c266da5",
+  "IsCustomNode": false,
+  "Description": null,
+  "Name": "TIES",
+  "ElementResolver": {
+    "ResolutionMap": {
+      "Vector.XAxis": {
+        "Key": "Autodesk.DesignScript.Geometry.Vector",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Point": {
+        "Key": "Autodesk.DesignScript.Geometry.Point",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Vector": {
+        "Key": "Autodesk.DesignScript.Geometry.Vector",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Geometry": {
+        "Key": "Autodesk.DesignScript.Geometry.Geometry",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Vector.YAxis": {
+        "Key": "Autodesk.DesignScript.Geometry.Vector",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Geometry.tr": {
+        "Key": "Autodesk.DesignScript.Geometry.Geometry",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Get": {
+        "Key": "DesignScript.Builtin.Get",
+        "Value": "DesignScriptBuiltin.dll"
+      },
+      "List": {
+        "Key": "List",
+        "Value": "BuiltIn.ds"
+      },
+      "PolyCurve": {
+        "Key": "Autodesk.DesignScript.Geometry.PolyCurve",
+        "Value": "ProtoGeometry.dll"
+      }
+    }
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "NodeType": "PythonScriptNode",
+      "Code": "# Load the Python Standard and DesignScript Libraries\r\nimport sys\r\nimport math\r\nimport clr\r\nfrom itertools import chain\r\nclr.AddReference('ProtoGeometry')\r\nfrom Autodesk.DesignScript.Geometry import *\r\nimport Autodesk\r\n\r\n\r\n\r\n# The inputs to this node will be stored as a list in the IN variables.\r\ndataEnteringNode = IN\r\n\r\n#\"\"\" Global Variables\"\"\"\r\n#b = int(input('please enter column's b length: '))\r\nb = 1500\r\n#h = int(input('please enter column's h length: '))\r\nh = 500\r\n#bp = list(range(int(input(\"please enter column's b side rebar number: \"))))\r\nbPoints = list(range(15))\r\n_bPoints = bPoints[:]\r\n#hp = list(range(int(input(\"please enter column's h side rebar number: \"))))\r\nhPoints = list(range(4))\r\n_hPoints = hPoints\r\n#sp = int(input(\"please enter v-spacing criteria: \"))\r\nsp = 150\r\n#hlen = int(input(\"Please enter h length criteria: \"))\r\nbMin = 600\r\n\r\nclearCover = 40\r\nvDia = 25\r\nhDia = 12\r\nvCover = clearCover+hDia+(vDia/2.0)\r\nhCover = clearCover+(hDia/2.0)\r\n\r\nasp = (b-(2*vCover))/float(len(bPoints)-1)\r\n\r\n#----------------------------------------------------------\r\n\"\"\" DYNAMO-PYTHON Geometry Function \"\"\"\r\ndef slc_2(l):\r\n\ta = l[::2]\r\n\tn = 2 \r\n\tfinal = [a[i * n:(i + 1) * n] for i in range((len(a) + n - 1) // n )]  \r\n\treturn slc(a, n)\r\ndef slc(a, n):\r\n    final = [a[i * n:(i + 1) * n] for i in range((len(a) + n - 1) // n )]  \r\n    return final\r\n# Concrete Column\r\nbasePoint = Point.ByCoordinates(0, 0, 0)\r\ndef column(basePoint, b, h):\r\n\tp1 = basePoint\r\n\tp2 = Geometry.Translate(p1, Vector.XAxis(), b)\r\n\tp3 = Geometry.Translate(p2, Vector.YAxis(), h)\r\n\tp4 = Geometry.Translate(p3, Vector.XAxis(), -b)\r\n\tlp = [p1, p2, p3, p4]\r\n\tpl = Polygon.ByPoints(lp)\r\n\treturn pl, lp\r\n#Driver\r\ncolumn = column(basePoint, b, h)\r\n\r\n# Vertical Rebar Distribution\r\ndef vRebar(basePoint, vCover, hCover, bPoints, hPoints, b, h):\r\n\t_p = Geometry.Translate(basePoint, Vector.ByCoordinates(vCover, vCover, 0))\r\n\tabsp = (b-(2*vCover))/(len(bPoints)-1)\r\n\tdabsp = absp\r\n\tahsp = (h-(2*vCover))/(len(hPoints)-1)\r\n\tdahsp = ahsp\r\n\tlbp = [_p]\r\n\t_lbp = []\r\n\tlhp = [_p]\r\n\t_lhp = []\r\n\tfor nb in range(len(bPoints)-1):\r\n\t\tlbp.append(Geometry.Translate(_p, Vector.ByCoordinates(dabsp, 0, 0)))\r\n\t\tdabsp += absp\r\n\tfor _nb in lbp:\r\n\t\t_lbp.append(Geometry.Translate(_nb, Vector.ByCoordinates(0, h-(2*vCover), 0)))\r\n\tfor nh in range(len(hPoints)-1):\r\n\t\tlhp.append(Geometry.Translate(_p, Vector.ByCoordinates(0, dahsp, 0)))\r\n\t\tdahsp += ahsp\r\n\tfor _nh in lhp:\r\n\t\t_lhp.append(Geometry.Translate(_nh, Vector.ByCoordinates(b-(2*vCover), 0, 0)))\r\n\treturn lbp[1:-1], _lbp[1:-1], lhp, _lhp\r\n\r\n#Driver\r\nvRebars = vRebar(basePoint, vCover, hCover, bPoints, hPoints, b, h)\r\n\r\n# Get rebars of same position in the opposit list\r\ndef getTwin(vRebar, currentRebars, side):\r\n\tvRebars = vRebar(basePoint, vCover, hCover, bPoints, hPoints, b, h)\r\n\tvRebarsbPointsList = vRebars[0]\r\n\tvRebars_bPointsList = vRebars[1]\r\n\tvRebarshPointsList = vRebars[2]\r\n\tvRebars_hPointsList = vRebars[3]\r\n\t\r\n\thVector = Vector.ByCoordinates(0, h, 0)\r\n\t\r\n\ttemp1 = list(chain.from_iterable(currentRebars))\r\n\ttemp2 = []\r\n\tn = len(currentRebars[0])\r\n\tfor l in temp1:\r\n\t\tli = temp1.index(l)\r\n\t\tif side == 'b':\r\n\t\t\tti = vRebarsbPointsList.index(l)\r\n\t\t\tt = vRebars_bPointsList[ti]\r\n\t\t\ttemp2.append(t)\r\n\toppositRebars = [temp2[i:i + n] for i in range(0, len(temp2), n)]\r\n\treturn oppositRebars\r\n\t\r\n# Getting Stirrup's curves from Pure Points:\r\ndef getCurve(stirrupPoints):\r\n\tcurrentPoints = stirrupPoints[0]\r\n\ttwinPoints = stirrupPoints[1]\r\n\tpurePoints = [currentPoints, twinPoints]\r\n\tfor lst in twinPoints:\r\n\t\tlist.reverse(lst)\r\n\tpurePoints_transposed = list(map(list, zip(*purePoints)))\r\n\tflattened = []\r\n\tfor i in purePoints_transposed:\r\n\t\tflattened.append(list(chain.from_iterable(i)))\r\n\treturn flattened\r\n# Conditioning Grouping:\r\ndef tie(p, vCover, hCover, bPoints, hPoints, b, h):\r\n\tvRebars = vRebar(p, vCover, hCover, bPoints, hPoints, b, h)\r\n\tvRebarsbPointsList = vRebars[0]\r\n\t#if len(vr[0]%2 != 0:\r\n\tbHalf = len(vRebarsbPointsList)/2\r\n\tb_leftRebar = vRebarsbPointsList[:bHalf]\r\n\tb_rightRebar = vRebarsbPointsList[bHalf+1:][::-1]\r\n\tpureb_leftRebar = b_leftRebar[3:]\r\n\tpureb_rightRebar = b_rightRebar[3:]\r\n\tbMid = vRebarsbPointsList[bHalf]\r\n\tif len(pureb_leftRebar) == 1:\r\n\t\tind = list((pureb_leftRebar[-1], pureb_rightRebar[-1]))\r\n\t\treturn ind\r\n\telif len(pureb_leftRebar) == 2:\r\n\t\tb_vRebarTie = list((pureb_leftRebar[-2:], pureb_rightRebar[-2:]))\r\n\t\t_b_vRebarTie = getTwin(vRebar, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\telif len(pureb_leftRebar) == 3:\r\n\t\tb_vRebarTie = list((pureb_leftRebar[::2], pureb_rightRebar[::2]))\r\n\t\t_b_vRebarTie = getTwin(vRebar, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\t#elif len(plr) > 3:\r\n\t\tif len(slc(a, 3)[-1]) == 1:\r\n\t\t\t#ind = list((plr[::2], prr[::2]))\r\n\t\t\t#ind.append([mid])\r\n\t\t\treturn len(slc(a, 3)[-1])\r\n\t\t#elif ((len(plr)-1) - plr.index(plr[::2][-1])) == 2:\r\n\t\t\t#ind = list((plr[::2])[-1])#, prr[::2]))\r\n\t\t\t#ind.append(list((plr[-1], prr[-1])))\r\n\t\t\t#return ind\r\n\t\t#return 2 #((len(plr)-1) - plr.index(plr[::2][-1]))\"\"\"\r\n\t\t#return mid\r\n\t\t\r\n#----------------------------------\r\n#OUT = column, vRebars, asp\r\nstirrups =  tie(basePoint, vCover, hCover, bPoints, hPoints, b, h)\r\n#OUT = stirrups\r\n#OUT = getTwin(vRebar, 1, 3)\r\nOUT = getCurve(stirrups), column, vRebars",
+      "VariableInputPorts": true,
+      "Id": "4c2929a6030f40b89e20bfe7ff74fa59",
+      "Inputs": [
+        {
+          "Id": "4e43b248854043899dac35692288d918",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "0f6cd5bc8d564399a6cadc97b98ac448",
+          "Name": "OUT",
+          "Description": "Result of the python script",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Runs an embedded IronPython script."
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.ZeroTouch.DSFunction, DynamoCore",
+      "NodeType": "FunctionNode",
+      "FunctionSignature": "Autodesk.DesignScript.Geometry.PolyCurve.ByPoints@Autodesk.DesignScript.Geometry.Point[],bool",
+      "Id": "51b36166871347079a0b22a0ce0b7e3c",
+      "Inputs": [
+        {
+          "Id": "fbb6f23a75164635aa352a54456dacbb",
+          "Name": "points",
+          "Description": "Points to make polycurve\n\nPoint[]",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "6d2051b770704a3e8666e8ecd0d8501a",
+          "Name": "connectLastToFirst",
+          "Description": "make close or open polycurve\n\nbool\nDefault value : false",
+          "UsingDefaultValue": true,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "4b6ebb88469b47b183e11a5080aff564",
+          "Name": "PolyCurve",
+          "Description": "PolyCurve",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Auto",
+      "Description": "Make PolyCurve by connecting points. Set the 'connectLastToFirst' input to true to close the PolyCurve.\n\nPolyCurve.ByPoints (points: Point[], connectLastToFirst: bool = false): PolyCurve"
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "NodeType": "BooleanInputNode",
+      "InputValue": true,
+      "Id": "fd0f8e68a6e54e339057dd8c4523fe64",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "4824892b2e2245ba94788cba7eaaa977",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Selection between a true and false."
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "a[0];",
+      "Id": "6747718378954930bf211dd128456c34",
+      "Inputs": [
+        {
+          "Id": "7ca1edd8a7784e6cb9d86c7e103b2f4d",
+          "Name": "a",
+          "Description": "a",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "d01211d4b8914c91bbb176fa2a295d95",
+          "Name": "",
+          "Description": "Value of expression at line 1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows for DesignScript code to be authored directly"
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "0f6cd5bc8d564399a6cadc97b98ac448",
+      "End": "7ca1edd8a7784e6cb9d86c7e103b2f4d",
+      "Id": "c2d3c8098fdb4736b55c4ee7e0b56550"
+    },
+    {
+      "Start": "4824892b2e2245ba94788cba7eaaa977",
+      "End": "6d2051b770704a3e8666e8ecd0d8501a",
+      "Id": "08d454389fa24a4a9239aa9c26624cee"
+    },
+    {
+      "Start": "d01211d4b8914c91bbb176fa2a295d95",
+      "End": "fbb6f23a75164635aa352a54456dacbb",
+      "Id": "0279319c0c514333956a54f954bc0af9"
+    }
+  ],
+  "Dependencies": [],
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 10000.0,
+      "HasRunWithoutCrash": true,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "2.1.0.7500",
+      "RunType": "Automatic",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "Background Preview",
+      "EyeX": 2029.9906527288849,
+      "EyeY": 2887.2534898238555,
+      "EyeZ": 1491.8186694413685,
+      "LookX": -1279.9906527288849,
+      "LookY": -2887.2534898238555,
+      "LookZ": -1741.8186694413685,
+      "UpX": -0.38693131097054007,
+      "UpY": 0.75699505565175629,
+      "UpZ": -0.526538361669318
+    },
+    "NodeViews": [
+      {
+        "ShowGeometry": true,
+        "Name": "Python Script",
+        "Id": "4c2929a6030f40b89e20bfe7ff74fa59",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -521.57272726611689,
+        "Y": 519.21070643265875
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "PolyCurve.ByPoints",
+        "Id": "51b36166871347079a0b22a0ce0b7e3c",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -311.49732439759532,
+        "Y": 235.02990013691007
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Boolean",
+        "Id": "fd0f8e68a6e54e339057dd8c4523fe64",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -228.04543816742148,
+        "Y": 456.59895091608365
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Code Block",
+        "Id": "6747718378954930bf211dd128456c34",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -611.0,
+        "Y": 237.0
+      }
+    ],
+    "Annotations": [],
+    "X": 1371.9653371586664,
+    "Y": -212.33971948206607,
+    "Zoom": 0.730808892694413
+  }
+}

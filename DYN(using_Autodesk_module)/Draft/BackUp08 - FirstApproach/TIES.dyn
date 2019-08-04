@@ -1,0 +1,833 @@
+{
+  "Uuid": "68657227-557d-4edf-8ce0-65e01c266da5",
+  "IsCustomNode": false,
+  "Description": null,
+  "Name": "TIES",
+  "ElementResolver": {
+    "ResolutionMap": {
+      "Vector.XAxis": {
+        "Key": "Autodesk.DesignScript.Geometry.Vector",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Point": {
+        "Key": "Autodesk.DesignScript.Geometry.Point",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Vector": {
+        "Key": "Autodesk.DesignScript.Geometry.Vector",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Geometry": {
+        "Key": "Autodesk.DesignScript.Geometry.Geometry",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Vector.YAxis": {
+        "Key": "Autodesk.DesignScript.Geometry.Vector",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Geometry.tr": {
+        "Key": "Autodesk.DesignScript.Geometry.Geometry",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Get": {
+        "Key": "DesignScript.Builtin.Get",
+        "Value": "DesignScriptBuiltin.dll"
+      },
+      "List": {
+        "Key": "List",
+        "Value": "BuiltIn.ds"
+      },
+      "PolyCurve": {
+        "Key": "Autodesk.DesignScript.Geometry.PolyCurve",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Line": {
+        "Key": "Autodesk.DesignScript.Geometry.Line",
+        "Value": "ProtoGeometry.dll"
+      }
+    }
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "NodeType": "PythonScriptNode",
+      "Code": "# Load the Python Standard and DesignScript Libraries\r\nimport sys\r\nimport math\r\nimport clr\r\nfrom itertools import chain\r\nclr.AddReference('ProtoGeometry')\r\nfrom Autodesk.DesignScript.Geometry import *\r\nimport Autodesk\r\nfrom itertools import islice\r\n\r\n\r\n# The inputs to this node will be stored as a list in the IN variables.\r\ndataEnteringNode = IN\r\n\r\n#\"\"\" Global Variables\"\"\"\r\n#b = int(input('please enter column's b length: '))\r\nbLen = 1500\r\n#h = int(input('please enter column's h length: '))\r\nhLen = 400\r\n#bp = list(range(int(input(\"please enter column's b side rebar number: \"))))\r\nbRange = list(range(IN[0]))\r\n_bRange = bRange[:]\r\n#hp = list(range(int(input(\"please enter column's h side rebar number: \"))))\r\nhRange = list(range(IN[1]))\r\n_hRange = hRange[:]\r\n#sp = int(input(\"please enter v-spacing criteria: \"))\r\nsp = IN[2]\r\n#hlen = int(input(\"Please enter h length criteria: \"))\r\nbMin = 600\r\n\r\ncc = 40\r\nvDia = 25\r\nhDia = 12\r\nvCover = cc+hDia+(vDia/2.0)\r\nhCover = cc+(hDia/2.0)\r\nasp = (bLen-(2*vCover))/float(len(bRange)-1)\r\nbasePoint = Point.ByCoordinates(0, 0, 0)\r\nvAttribute = {'basePoint': basePoint,'clearCover': cc, 'vCover': vCover, 'hCover': hCover, 'bRange': bRange, \r\n'_bRange': _bRange, 'hRange': hRange, '_hRange': _hRange, 'bLen': bLen, 'hLen': hLen, 'spacing': sp, 'actualSpacing': asp}\r\n#----------------------------------------------------------\r\n\"\"\" DYNAMO-PYTHON Geometry Function \"\"\"\r\ndef slc(lst, attribute_Dict): #to slice vertical rebar list into pattern.\r\n\tif attribute_Dict['spacing'] <= 150:\r\n\t\tpattRange = 3\r\n\telse:\r\n\t\tpattRange = 2\r\n\tdiv = [pattRange, 1]\r\n\tpatt = (len(lst)//2)*div\r\n\tit = iter(lst)\r\n\tsliced =[list(islice(it, 0, i)) for i in patt]\r\n\tfor i in sliced[::-1]:\r\n\t    if i == []:\r\n        \tsliced.remove(i)\r\n\treturn sliced\r\n# Concrete Column\r\n\r\n\r\ndef column(attribute_Dict):\r\n\tp1 = vAttribute['basePoint']\r\n\tp2 = Geometry.Translate(p1, Vector.XAxis(), vAttribute['bLen'])\r\n\tp3 = Geometry.Translate(p2, Vector.YAxis(), vAttribute['hLen'])\r\n\tp4 = Geometry.Translate(p3, Vector.XAxis(), -vAttribute['bLen'])\r\n\tlp = [p1, p2, p3, p4]\r\n\tpl = Polygon.ByPoints(lp)\r\n\treturn pl, lp\r\n\r\n# Vertical Rebar Distribution\r\ndef vRebar(attribute_Dict):#basePoint, vCover, hCover, bPoints, hPoints, b, h):\r\n\t_p = Geometry.Translate(vAttribute['basePoint'], Vector.ByCoordinates(vAttribute['vCover'], vAttribute['vCover'], 0))\r\n\tabsp = (vAttribute['bLen']-(2*vAttribute['vCover']))/(len(vAttribute['bRange'])-1)\r\n\tdabsp = absp\r\n\tahsp = (vAttribute['hLen']-(2*vAttribute['vCover']))/(len(vAttribute['hRange'])-1)\r\n\tdahsp = ahsp\r\n\tlbp = [_p]\r\n\t_lbp = []\r\n\tlhp = [_p]\r\n\t_lhp = []\r\n\tfor nb in range(len(vAttribute['bRange'])-1):\r\n\t\tlbp.append(Geometry.Translate(_p, Vector.ByCoordinates(dabsp, 0, 0)))\r\n\t\tdabsp += absp\r\n\tfor _nb in lbp:\r\n\t\t_lbp.append(Geometry.Translate(_nb, Vector.ByCoordinates(0, vAttribute['hLen']-(2*vAttribute['vCover']), 0)))\r\n\tfor nh in range(len(vAttribute['hRange'])-1):\r\n\t\tlhp.append(Geometry.Translate(_p, Vector.ByCoordinates(0, dahsp, 0)))\r\n\t\tdahsp += ahsp\r\n\tfor _nh in lhp:\r\n\t\t_lhp.append(Geometry.Translate(_nh, Vector.ByCoordinates(vAttribute['bLen']-(2*vAttribute['vCover']), 0, 0)))\r\n\tvertical = {'bPoints': lbp[1:-1],'_bPoints': _lbp[1:-1], 'hPoints': lhp, '_hPoints': _lhp}\r\n\treturn vertical\r\n\r\n# Get rebars of same position in the opposit list\r\ndef getTwin(vertical_Dict, range_to_check, currentRebars, side):\r\n\tif len(range_to_check['pureb_left']) == 0:\r\n\t\ttemp1 = currentRebars[:]\r\n\t\toppositRebars = []\r\n\t\tfor i in temp1:\r\n\t\t\tif side == 'b':\r\n\t\t\t\tti = vertical_Dict['bPoints'].index(i)\r\n\t\t\t\tt = vertical_Dict['_bPoints'][ti]\r\n\t\t\t\toppositRebars.append(t)\r\n\t\treturn oppositRebars\r\n\tif len(range_to_check['pureb_left']) == 1:\r\n\t\ttemp1 = currentRebars[:]\r\n\t\toppositRebars = []\r\n\t\tfor i in temp1:\r\n\t\t\tif side == 'b':\r\n\t\t\t\tti = vertical_Dict['bPoints'].index(i)\r\n\t\t\t\tt = vertical_Dict['_bPoints'][ti]\r\n\t\t\t\toppositRebars.append(t)\r\n\t\treturn oppositRebars\r\n\telif len(range_to_check['pureb_left']) >= 2:\r\n\t\ttemp1 = list(chain.from_iterable(currentRebars))\r\n\t\ttemp2 = []\r\n\t\tn = len(currentRebars[0])\r\n\t\tfor l in temp1:\r\n\t\t\tli = temp1.index(l)\r\n\t\t\tif side == 'b':\r\n\t\t\t\tti = vertical_Dict['bPoints'].index(l)\r\n\t\t\t\tt = vertical_Dict['_bPoints'][ti]\r\n\t\t\t\ttemp2.append(t)\r\n\t\toppositRebars = [temp2[i:i + n] for i in range(0, len(temp2), n)]\r\n\t\treturn oppositRebars\r\n\t\r\n# Getting Stirrup's curves from Pure Points:\r\ndef getCurve(stirrupPoints):\r\n\tcurrentPoints = stirrupPoints[0]\r\n\ttwinPoints = stirrupPoints[1]\r\n\tpurePoints = [currentPoints, twinPoints]\r\n\ttry:\r\n\t\tfor lst in twinPoints:\r\n\t\t\tlist.reverse(lst)\r\n\t\tpurePoints_transposed = list(map(list, zip(*purePoints)))\r\n\t\tflattened = []\r\n\t\tfor i in purePoints_transposed:\r\n\t\t\tflattened.append(list(chain.from_iterable(i)))\r\n\t\treturn flattened\r\n\texcept: #for single pure rebar per one half of a side\r\n\t\tlist.reverse(twinPoints)\r\n\t\tflattened = []\r\n\t\tflattened.append(list(chain.from_iterable(purePoints)))\r\n\t\treturn flattened\r\n# Conditioning Grouping:\r\n# Main Function:\r\ndef stirrups(vertical_Dict, attribute_Dict, range_to_check):\r\n\tmainTies = tie(vertical_Dict, attribute_Dict, range_to_check)\r\n\tsideTies = tieSide(vertical_Dict, attribute_Dict)\r\n\tcurves_mainTies = getCurve(mainTies)\r\n\treturn curves_mainTies, sideTies\r\n\tif len(hPoints) <= 3:\r\n\t\treturn curves_mainTies\r\n\telif len(hPoints) >3:\r\n\t\treturn curves_mainTies, sideTies\r\n\r\ndef tieSide(vertical_Dict, attribute_Dict):\r\n\thHalf = len(vertical_Dict['hPoints'])/2\r\n\th_leftRebar = vertical_Dict['hPoints'][:hHalf]\r\n\th_rightRebar = vertical_Dict['hPoints'][hHalf+1:][::-1]\r\n\tpureh_Rebar = vertical_Dict['hPoints'][1:-1]\r\n\t\r\n\tleftMostB = vertical_Dict['bPoints'][0], vertical_Dict['_bPoints'][0]\r\n\trightMostB = vertical_Dict['bPoints'][-1], vertical_Dict['_bPoints'][-1]\r\n\th_mid = vertical_Dict['hPoints'][hHalf]\r\n\th_vRebarTieTemp = []\r\n\t_h_vRebarTieTemp = []\r\n\t\r\n\tif len(vertical_Dict['hPoints']) == 4:\r\n\t\th_vRebarTieTemp.append(vertical_Dict['hPoints'][1:-1])\r\n\t\th_vRebarTieTemp.append(leftMostB[::-1])\r\n\t\t_h_vRebarTieTemp.append(vertical_Dict['_hPoints'][1:-1])\r\n\t\t_h_vRebarTieTemp.append(rightMostB[::-1])\r\n\t\th_vRebarTie = [item for sublist in h_vRebarTieTemp for item in sublist]\r\n\t\t_h_vRebarTie = [item for sublist in _h_vRebarTieTemp for item in sublist]\r\n\t\treturn h_vRebarTie, _h_vRebarTie\r\n\telif len(vertical_Dict['hPoints']) == 5:\r\n\t\th_vRebarTieTemp.append([vertical_Dict['hPoints'][2]])\r\n\t\th_vRebarTieTemp.append(leftMostB[::-1])\r\n\t\t_h_vRebarTieTemp.append([vertical_Dict['_hPoints'][2]])\r\n\t\t_h_vRebarTieTemp.append(rightMostB[::-1])\r\n\t\th_vRebarTie = [item for sublist in h_vRebarTieTemp for item in sublist]\r\n\t\t_h_vRebarTie = [item for sublist in _h_vRebarTieTemp for item in sublist]\r\n\t\treturn h_vRebarTie, _h_vRebarTie\r\n\telif len(vertical_Dict['hPoints']) == 6 or len(vertical_Dict['hPoints']) == 7:\r\n\t\th_vRebarTieTemp.append(vertical_Dict['hPoints'][2:-2])\r\n\t\th_vRebarTieTemp.append(leftMostB[::-1])\r\n\t\t_h_vRebarTieTemp.append(vertical_Dict['_bPoints'][2:-2])\r\n\t\t_h_vRebarTieTemp.append(rightMostB[::-1])\r\n\t\th_vRebarTie = [item for sublist in h_vRebarTieTemp for item in sublist]\r\n\t\t_h_vRebarTie = [item for sublist in _h_vRebarTieTemp for item in sublist]\r\n\t\treturn h_vRebarTie, _h_vRebarTie\r\n\r\n# Determine what range to look at for applying stirrups condition according to side rebars number\r\ndef check_range(vertical_Dict, attribute_Dict):\r\n\tbHalf = len(vertical_Dict['bPoints'])/2\r\n\tb_mid = vertical_Dict['bPoints'][bHalf]\r\n\tif attribute_Dict['spacing'] <= 150:\r\n\t\tif len(attribute_Dict['hRange']) <= 3:\r\n\t\t\tb_first = 1\r\n\t\telse:\r\n\t\t\tb_first = 2\r\n\telse:\r\n\t\tif len(attribute_Dict['hRange']) <= 3:\r\n\t\t\tb_first = 0\r\n\t\telse:\r\n\t\t\tb_first = 1\r\n\r\n\tif len(vertical_Dict['bPoints'])%2 != 0:\r\n\t\tb_leftRebar = vertical_Dict['bPoints'][:bHalf]\r\n\t\tb_rightRebar = vertical_Dict['bPoints'][bHalf+1:][::-1]\r\n\telse:\r\n\t\tb_leftRebar = vertical_Dict['bPoints'][:bHalf]\r\n\t\tb_rightRebar = vertical_Dict['bPoints'][bHalf:][::-1]\r\n\r\n\tpureb_left = b_leftRebar[b_first:]\r\n\tpureb_right = b_rightRebar[b_first:]\r\n\tpure = {'pureb_left': pureb_left, 'pureb_right': pureb_right, 'b_mid': b_mid}\r\n\treturn pure\r\n\r\ndef tie(vertical_Dict, attribute_Dict, range_to_check):\r\n\tif len(vertical_Dict['bPoints'])%2 != 0:\t#Odd Number\r\n\t\treturn tieOdd(vertical_Dict, attribute_Dict, range_to_check)\r\n\telse:\t\t\t\t\t\t#Even Number\r\n\t\treturn tieEven(vertical_Dict, attribute_Dict, range_to_check)\r\n\r\ndef tieOdd(vertical_Dict, attribute_Dict, range_to_check):\r\n\tif len(range_to_check['pureb_left']) <= 3:\r\n\t\treturn tieOdd1(vertical_Dict, attribute_Dict, range_to_check)\r\n\telse:\r\n\t\treturn tieOdd2(vertical_Dict, attribute_Dict, range_to_check)\r\n\r\ndef tieEven(vertical_Dict, attribute_Dict, range_to_check):\r\n\tif len(range_to_check['pureb_left']) <= 3:\r\n\t\treturn tieEven1(vertical_Dict, attribute_Dict, range_to_check)\r\n\telse:\r\n\t\treturn tieEven2(vertical_Dict, attribute_Dict, range_to_check)\r\n\r\ndef tieOdd1(vertical_Dict, attribute_Dict, range_to_check):\r\n\tif len(range_to_check['pureb_left']) == 0:\r\n\t\tb_vRebarTie = [range_to_check['b_mid']]\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\tif len(range_to_check['pureb_left']) == 1:\r\n\t\tb_vRebarTie = list((range_to_check['pureb_left'][-1], range_to_check['pureb_right'][-1]))\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\telif len(range_to_check['pureb_left']) == 2:\r\n\t\tb_vRebarTie = list((range_to_check['pureb_left'][-2:], range_to_check['pureb_right'][-2:]))\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\telif len(range_to_check['pureb_left']) == 3:\r\n\t\tb_vRebarTie = list((range_to_check['pureb_left'][::2], range_to_check['pureb_right'][::2]))\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\r\ndef tieEven1(vertical_Dict, attribute_Dict, range_to_check):\t\r\n\tif len(range_to_check['pureb_left']) == 0:\r\n\t\tb_vRebarTie = list((range_to_check['pureb_left'][-1], range_to_check['pureb_right'][-1]))\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\telif len(range_to_check['pureb_left']) == 1:\r\n\t\tb_vRebarTie = list((range_to_check['pureb_left'][-1], range_to_check['pureb_right'][-1]))\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\telif len(range_to_check['pureb_left']) == 2 or len(range_to_check['pureb_left']) == 3:\r\n\t\tb_vRebarTie = list((range_to_check['pureb_left'][::len(range_to_check['pureb_left'])-1], range_to_check['pureb_right'][::len(range_to_check['pureb_right'])-1]))\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\r\ndef tieOdd2(vertical_Dict, attribute_Dict, range_to_check):\r\n\taLeft = slc(range_to_check['pureb_left'], attribute_Dict)\r\n\taRight = slc(range_to_check['pureb_right'], attribute_Dict)\r\n\tlenLast = len(aLeft[-1])\r\n\tlenBeforeLast = len(aLeft[-2])\r\n\tb_vRebarTie = []\r\n\tif lenLast == 1 and lenBeforeLast == 3:\t\t\t#17\r\n\t\tfor i in aLeft:\r\n\t\t\tif len(i) == 3:\r\n\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\tfor i in aRight:\r\n\t\t\tif len(i) == 3:\r\n\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\tb_vRebarTie.append([range_to_check['b_mid']])\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\telif lenLast == 1 and lenBeforeLast == 1:\t\t#19\r\n\t\tfor i in aLeft:\r\n\t\t\tif len(i) == 3:\r\n\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\tb_vRebarTie.append(aLeft[-1])\r\n\t\tb_vRebarTie[-1].append(aRight[-1][0])\r\n\t\tfor i in aRight:\r\n\t\t\tif len(i) == 3:\r\n\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\telse: \t\t\t\t\t\t\t\t\t\t\t#21 onward\r\n\t\tfor i in aLeft:\r\n\t\t\tif len(i) == 3 or len(i) == 2:\r\n\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\tfor i in aRight:\r\n\t\t\tif len(i) == 3 or len(i) == 2:\r\n\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\r\ndef tieEven2(vertical_Dict, attribute_Dict, range_to_check):\r\n\taLeft = slc(range_to_check['pureb_left'])\r\n\taRight = slc(range_to_check['pureb_right'])\r\n\tlenLast = len(aLeft[-1])\r\n\tlenBeforeLast = len(aLeft[-2])\r\n\tb_vRebarTie = []\r\n\r\n\tif lenLast == 1 and lenBeforeLast == 3:\t\t\t#17\r\n\t\tif len(aLeft) == 2:\r\n\t\t\tb_vRebarTie.append(aLeft[-2][0:2])\r\n\t\t\tb_vRebarTie.append(aLeft[-1])\r\n\t\t\tb_vRebarTie[-1].append(aRight[-1][0])\r\n\t\t\tb_vRebarTie.append(aRight[-2][0:2])\r\n\t\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\t\treturn b_vRebarTie, _b_vRebarTie\r\n\t\tif len(aLeft) > 2:\r\n\t\t\tfor i in aLeft[:-2]:\r\n\t\t\t\tif len(i) == 3:\r\n\t\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\t\tb_vRebarTie.append(aLeft[-2][0:2])\r\n\t\t\tb_vRebarTie.append(aLeft[-1])\r\n\t\t\tb_vRebarTie[-1].append(aRight[-1][0])\r\n\t\t\tb_vRebarTie.append(aRight[-2][0:2])\r\n\t\t\tfor i in aRight[:-2]:\r\n\t\t\t\tif len(i) == 3:\r\n\t\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\t\treturn b_vRebarTie, _b_vRebarTie\r\n\telif lenLast == 1 and lenBeforeLast == 1:\t\t#19\r\n\t\tfor i in aLeft:\r\n\t\t\tif len(i) == 3:\r\n\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\tb_vRebarTie.append(aLeft[-1])\r\n\t\tb_vRebarTie[-1].append(aRight[-1][0])\r\n\t\tfor i in aRight:\r\n\t\t\tif len(i) == 3:\r\n\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n\telse: \t\t\t\t\t\t\t\t\t\t\t#21 onward\r\n\t\tfor i in aLeft:\r\n\t\t\tif len(i) == 3 or len(i) == 2:\r\n\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\tfor i in aRight:\r\n\t\t\tif len(i) == 3 or len(i) == 2:\r\n\t\t\t\tb_vRebarTie.append([i[0], i[-1]])\r\n\t\t_b_vRebarTie = getTwin(vertical_Dict, range_to_check, b_vRebarTie, 'b')\r\n\t\treturn b_vRebarTie, _b_vRebarTie\r\n#----------------------------------\r\n# TESTING\r\ncolumn = column(vAttribute)\r\nvRebars = vRebar(vAttribute)\r\npureRebars = check_range(vRebars, vAttribute)\r\nties = tie(vRebars, vAttribute, pureRebars)\r\nlinks = stirrups(vRebars, vAttribute, pureRebars)\r\n#OUT = check_range(vRebars, vAttribute)\r\n#OUT = getTwin(vRebar, 1, 3)\r\nOUT = ties\r\nOUT = links, vRebars, column\r\n#OUT = vAttribute, column, vRebars",
+      "VariableInputPorts": true,
+      "Id": "4c2929a6030f40b89e20bfe7ff74fa59",
+      "Inputs": [
+        {
+          "Id": "4e43b248854043899dac35692288d918",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "c5b8c54bcb354d86b95c609252348bb9",
+          "Name": "IN[1]",
+          "Description": "Input #1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "7a73e52f23ea491996c13b751f7e36ef",
+          "Name": "IN[2]",
+          "Description": "Input #2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "0f6cd5bc8d564399a6cadc97b98ac448",
+          "Name": "OUT",
+          "Description": "Result of the python script",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Runs an embedded IronPython script."
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "t2 = List.Flatten(t3, -1);\nvector1 = Vector.ByCoordinates(0, 0, -10000);\nstirrup = (0..10000..150);\nvector2 = Vector.ByCoordinates(0, 0, -stirrup);\ngeometry1 = Geometry.Translate(t2, vector1);\nline1 = Line.ByStartPointEndPoint(t2, geometry1);\npolyCurve1 = PolyCurve.ByPoints(t5, true);\ngeometry2 = Geometry.Translate(polyCurve1<1>, vector2<2>);\na = vector2;",
+      "Id": "af3c444caa914b3c9d0ec8248a3f4718",
+      "Inputs": [
+        {
+          "Id": "8b22a29580c54ce582ce0227a78faf37",
+          "Name": "t3",
+          "Description": "t3",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "8c2cc0624e384ad89439d69dcd9c8554",
+          "Name": "t5",
+          "Description": "t5",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "25fa526dba0841b2925f2e3649627a6d",
+          "Name": "",
+          "Description": "t2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "8ea9df15002447d5a88986538b05e53c",
+          "Name": "",
+          "Description": "vector1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "743f7c177ffc4a0e9c88438405601f32",
+          "Name": "",
+          "Description": "stirrup",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "89787bf5b2174c9abfe4fe87e24465ca",
+          "Name": "",
+          "Description": "vector2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "d777492f14dc4c71becf6040a73d048d",
+          "Name": "",
+          "Description": "geometry1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "469f13a48df74fba9fddd3b9888e6e4b",
+          "Name": "",
+          "Description": "line1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "85958e26c5084fc69d7b940529eda8c8",
+          "Name": "",
+          "Description": "polyCurve1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "293eb2591775493b821779a57e4fb317",
+          "Name": "",
+          "Description": "geometry2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "16dca309cbc64d9da5e37d178018c2eb",
+          "Name": "",
+          "Description": "a",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows for DesignScript code to be authored directly"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "a[1];",
+      "Id": "ab5865f25e914e4b830f50eec617159f",
+      "Inputs": [
+        {
+          "Id": "f883e555c6554ec9aeebde74dbca49c8",
+          "Name": "a",
+          "Description": "a",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "dec21ca63a524f66834e73c5166f4670",
+          "Name": "",
+          "Description": "Value of expression at line 1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows for DesignScript code to be authored directly"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.ZeroTouch.DSFunction, DynamoCore",
+      "NodeType": "FunctionNode",
+      "FunctionSignature": "Autodesk.DesignScript.Geometry.PolyCurve.ByPoints@Autodesk.DesignScript.Geometry.Point[],bool",
+      "Id": "60407c4cfcf446beb50de49cc979d975",
+      "Inputs": [
+        {
+          "Id": "81bad05661ab4b9497ffc52c9bf2e65c",
+          "Name": "points",
+          "Description": "Points to make polycurve\n\nPoint[]",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "3dc51ffac9244ddda3afe863af83d0c4",
+          "Name": "connectLastToFirst",
+          "Description": "make close or open polycurve\n\nbool\nDefault value : false",
+          "UsingDefaultValue": true,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "289b6c50c7cf4143a0845fd879a1892f",
+          "Name": "PolyCurve",
+          "Description": "PolyCurve",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Auto",
+      "Description": "Make PolyCurve by connecting points. Set the 'connectLastToFirst' input to true to close the PolyCurve.\n\nPolyCurve.ByPoints (points: Point[], connectLastToFirst: bool = false): PolyCurve"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "true;",
+      "Id": "08958880f6974cbc89ab31458c44839d",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "36c10a1957434bc48d313a5cd6523808",
+          "Name": "",
+          "Description": "Value of expression at line 1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows for DesignScript code to be authored directly"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "a[0];",
+      "Id": "6747718378954930bf211dd128456c34",
+      "Inputs": [
+        {
+          "Id": "7adce23ba7524059a2e7c454271b91be",
+          "Name": "a",
+          "Description": "a",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "cc3472c6f6bc47c0ad0e8ae0091e21f7",
+          "Name": "",
+          "Description": "Value of expression at line 1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows for DesignScript code to be authored directly"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "a = i[-1];\nb = i[-2];\nc = a[0];\nd = a[-1];\ne = b[0];\nf = b[-1];\nall = [c, d, f, e];",
+      "Id": "cb7bd1f36277409f9c30847af3292f78",
+      "Inputs": [
+        {
+          "Id": "1337e6efa44f486f9af7db6525b1d3e7",
+          "Name": "i",
+          "Description": "i",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "d46127a998b5461aa815de92538411a5",
+          "Name": "",
+          "Description": "a",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "38b02608611c4a2dbd5d59a7c130a7b4",
+          "Name": "",
+          "Description": "b",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "3a4b14d90cef4d5fa176808d9466f614",
+          "Name": "",
+          "Description": "c",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "d7bc171732a54f1e8fcaae2efa9f603f",
+          "Name": "",
+          "Description": "d",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "544d4a165cb24210ae96d960fd211b3d",
+          "Name": "",
+          "Description": "e",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "ece571147e1f4796bbb74e25fc4fcaaf",
+          "Name": "",
+          "Description": "f",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "ae24764fb1844cbab9f5adb8305f258a",
+          "Name": "",
+          "Description": "all",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows for DesignScript code to be authored directly"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.ZeroTouch.DSFunction, DynamoCore",
+      "NodeType": "FunctionNode",
+      "FunctionSignature": "Autodesk.DesignScript.Geometry.PolyCurve.ByPoints@Autodesk.DesignScript.Geometry.Point[],bool",
+      "Id": "f8974ccd16b14fa5b02f0ea38cad2254",
+      "Inputs": [
+        {
+          "Id": "f9b180f2df5c43fea3a607e309bedf82",
+          "Name": "points",
+          "Description": "Points to make polycurve\n\nPoint[]",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "773b55f147b54b3c954b2b15fd943d11",
+          "Name": "connectLastToFirst",
+          "Description": "make close or open polycurve\n\nbool\nDefault value : false",
+          "UsingDefaultValue": true,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "aefc93f4c205498a8705e612540e514d",
+          "Name": "PolyCurve",
+          "Description": "PolyCurve",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Auto",
+      "Description": "Make PolyCurve by connecting points. Set the 'connectLastToFirst' input to true to close the PolyCurve.\n\nPolyCurve.ByPoints (points: Point[], connectLastToFirst: bool = false): PolyCurve"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "a[0];\na[1];",
+      "Id": "d04228a5c84c47e6ace4faf0c058e781",
+      "Inputs": [
+        {
+          "Id": "315684f8265e4aceb3cb7dc070dfc055",
+          "Name": "a",
+          "Description": "a",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "e153138497d9464cbfa9df0bee353887",
+          "Name": "",
+          "Description": "Value of expression at line 1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "f796ffe2a84f4900a9c8484862e2394e",
+          "Name": "",
+          "Description": "Value of expression at line 2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows for DesignScript code to be authored directly"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "[a, b];",
+      "Id": "da32ca05702948f288debae2a1a616ea",
+      "Inputs": [
+        {
+          "Id": "9468478479864ab18a151634c5b62202",
+          "Name": "a",
+          "Description": "a",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "5e5d450096844970a65a4f54c8126818",
+          "Name": "b",
+          "Description": "b",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "1bbc329b680f4f628398b44f91fb21e4",
+          "Name": "",
+          "Description": "Value of expression at line 1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows for DesignScript code to be authored directly"
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.IntegerSlider, CoreNodeModels",
+      "NodeType": "NumberInputNode",
+      "NumberType": "Integer",
+      "InputValue": 21,
+      "MaximumValue": 500,
+      "MinimumValue": 1,
+      "StepValue": 1,
+      "Id": "ffa28ff92ada4b19855329900ee96887",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "ece06d78d8304a798d0a42fc111a05dc",
+          "Name": "",
+          "Description": "Int32",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "A slider that produces integer values."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.IntegerSlider, CoreNodeModels",
+      "NodeType": "NumberInputNode",
+      "NumberType": "Integer",
+      "InputValue": 4,
+      "MaximumValue": 7,
+      "MinimumValue": 1,
+      "StepValue": 1,
+      "Id": "a7f38b37b4cf4e089f644a7700d02f02",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "89b19b703f024d86b7d5ecf4d8da076f",
+          "Name": "",
+          "Description": "Int32",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "A slider that produces integer values."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.IntegerSlider, CoreNodeModels",
+      "NodeType": "NumberInputNode",
+      "NumberType": "Integer",
+      "InputValue": 150,
+      "MaximumValue": 600,
+      "MinimumValue": 1,
+      "StepValue": 1,
+      "Id": "a97f6e6943c34b15a18dc015fd3ccaec",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "faa68dd2f18c4953929c8ec6ecf7170e",
+          "Name": "",
+          "Description": "Int32",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "A slider that produces integer values."
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "0f6cd5bc8d564399a6cadc97b98ac448",
+      "End": "7adce23ba7524059a2e7c454271b91be",
+      "Id": "ed444142a821481bbbbf971e1212ae5d"
+    },
+    {
+      "Start": "0f6cd5bc8d564399a6cadc97b98ac448",
+      "End": "81bad05661ab4b9497ffc52c9bf2e65c",
+      "Id": "70149af249f4479c98b797cd5c0c5dc4"
+    },
+    {
+      "Start": "dec21ca63a524f66834e73c5166f4670",
+      "End": "1337e6efa44f486f9af7db6525b1d3e7",
+      "Id": "ea8ac5ebac3841b98b5053e8f12aadc5"
+    },
+    {
+      "Start": "dec21ca63a524f66834e73c5166f4670",
+      "End": "5e5d450096844970a65a4f54c8126818",
+      "Id": "51863b6c60f742c296543f0d7ff5c459"
+    },
+    {
+      "Start": "36c10a1957434bc48d313a5cd6523808",
+      "End": "3dc51ffac9244ddda3afe863af83d0c4",
+      "Id": "13cfa277386d4f0db31d4ccd07b3a123"
+    },
+    {
+      "Start": "36c10a1957434bc48d313a5cd6523808",
+      "End": "773b55f147b54b3c954b2b15fd943d11",
+      "Id": "ce55bcbe6ff742198cb2c423649f2e4d"
+    },
+    {
+      "Start": "cc3472c6f6bc47c0ad0e8ae0091e21f7",
+      "End": "9468478479864ab18a151634c5b62202",
+      "Id": "c75dade0363d4f4c84655bf5a38446f6"
+    },
+    {
+      "Start": "ae24764fb1844cbab9f5adb8305f258a",
+      "End": "f9b180f2df5c43fea3a607e309bedf82",
+      "Id": "8ea2110b46564d699cf7a0ca3c5ffd9b"
+    },
+    {
+      "Start": "e153138497d9464cbfa9df0bee353887",
+      "End": "8c2cc0624e384ad89439d69dcd9c8554",
+      "Id": "96252f4f64984c908926246c2c020df7"
+    },
+    {
+      "Start": "f796ffe2a84f4900a9c8484862e2394e",
+      "End": "8b22a29580c54ce582ce0227a78faf37",
+      "Id": "d6c4cb3e6f664804b959620f14b370b2"
+    },
+    {
+      "Start": "ece06d78d8304a798d0a42fc111a05dc",
+      "End": "4e43b248854043899dac35692288d918",
+      "Id": "b0537852c2524d9eac299e1136903bfa"
+    },
+    {
+      "Start": "89b19b703f024d86b7d5ecf4d8da076f",
+      "End": "c5b8c54bcb354d86b95c609252348bb9",
+      "Id": "a449ee2516c545ceaf7480df76ad8b7c"
+    },
+    {
+      "Start": "faa68dd2f18c4953929c8ec6ecf7170e",
+      "End": "7a73e52f23ea491996c13b751f7e36ef",
+      "Id": "9e0c9b1b1a5946989013cb6524119ee0"
+    }
+  ],
+  "Dependencies": [],
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 10000.0,
+      "HasRunWithoutCrash": true,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "2.1.0.7500",
+      "RunType": "Automatic",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "Background Preview",
+      "EyeX": 1521.7611159414885,
+      "EyeY": 1229.7338487547588,
+      "EyeZ": 1138.1430249366065,
+      "LookX": -1074.4976387668771,
+      "LookY": -2081.5180191083109,
+      "LookZ": -622.59816602892352,
+      "UpX": -0.63073606451612174,
+      "UpY": 0.68454710592868384,
+      "UpZ": -0.36546857140300743
+    },
+    "NodeViews": [
+      {
+        "Id": "4c2929a6030f40b89e20bfe7ff74fa59",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "Python Script",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -963.54899616978628,
+        "Y": 501.52900955352879
+      },
+      {
+        "Id": "af3c444caa914b3c9d0ec8248a3f4718",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "Test Output",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -230.6232986049904,
+        "Y": 426.84256591118753
+      },
+      {
+        "Id": "ab5865f25e914e4b830f50eec617159f",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "T3",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -732.122625825953,
+        "Y": 596.3502575161682
+      },
+      {
+        "Id": "60407c4cfcf446beb50de49cc979d975",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "PolyCurve.ByPoints",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -379.33364309408682,
+        "Y": 275.16283688870516
+      },
+      {
+        "Id": "08958880f6974cbc89ab31458c44839d",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "Code Block",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -511.22496052288449,
+        "Y": 592.27967791481558
+      },
+      {
+        "Id": "6747718378954930bf211dd128456c34",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "T5",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -718.23869963939535,
+        "Y": 341.00180089444848
+      },
+      {
+        "Id": "cb7bd1f36277409f9c30847af3292f78",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "Code Block",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -680.96338423486634,
+        "Y": 759.07103386302344
+      },
+      {
+        "Id": "f8974ccd16b14fa5b02f0ea38cad2254",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "PolyCurve.ByPoints",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -317.70286627455619,
+        "Y": 812.23103488746847
+      },
+      {
+        "Id": "d04228a5c84c47e6ace4faf0c058e781",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "Code Block",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -355.8038988039375,
+        "Y": 443.3423326110003
+      },
+      {
+        "Id": "da32ca05702948f288debae2a1a616ea",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "Code Block",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -568.83355455032256,
+        "Y": 442.59905724723626
+      },
+      {
+        "Id": "ffa28ff92ada4b19855329900ee96887",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "B Side Rebars",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -1401.5940754068474,
+        "Y": 464.35589936813642
+      },
+      {
+        "Id": "a7f38b37b4cf4e089f644a7700d02f02",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "H Side Rebars",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -1399.9615814081942,
+        "Y": 551.47869867383213
+      },
+      {
+        "Id": "a97f6e6943c34b15a18dc015fd3ccaec",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "Spacing",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": -1391.7655048999643,
+        "Y": 653.34422099040626
+      }
+    ],
+    "Annotations": [],
+    "X": 1738.0323326617993,
+    "Y": -46.207623851717045,
+    "Zoom": 0.722128150241938
+  }
+}
