@@ -5,7 +5,7 @@ from itertools import chain
 from itertools import islice
 import matplotlib.pyplot as plt
 from shapely import geometry, affinity
-# Testing GITHUP
+
 """ Global Variables"""
 b_length = 1500
 h_length = 600
