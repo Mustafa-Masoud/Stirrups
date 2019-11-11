@@ -6,6 +6,7 @@ from itertools import islice
 import matplotlib.pyplot as plt
 from shapely import geometry, affinity
 
+
 """ Global Variables"""
 b_length = 1500
 h_length = 600
